@@ -1,0 +1,1 @@
+This is a simple utility in NodeJS for pushging files from a local file system to S3.

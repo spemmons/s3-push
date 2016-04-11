@@ -1,0 +1,122 @@
+#!/usr/bin/env node
+
+var events = require('events');
+var emitter = new events.EventEmitter();
+
+// PROCESS COMMAND LINE
+
+var process = require('process');
+var commander = require('commander');
+
+var args = {};
+
+commander
+    .version('0.0.1')
+    .option('-v --verbose','verbose mode',true)
+    .arguments('<srcpath> <dstbucket> <prefix>')
+    .action(function(srcpath,dstbucket,prefix){
+        args.srcpath = srcpath;
+        args.dstbucket = dstbucket;
+        args.prefix = prefix;
+    })
+    .parse(process.argv);
+
+var _ = require('lodash');
+
+if (_.isEmpty(_.keys(args))) exitOnError('No arguments given');
+
+// COLLECT EXISTING OBJECTS
+
+var aws = require('aws-sdk');
+var s3 = new aws.S3();
+
+var existingObjects = {};
+
+function buildExistingObjects(nextMarker) {
+    s3.listObjects({Bucket: args.dstbucket,Prefix: args.prefix,Marker: nextMarker || ''},function(err,data){
+        exitOnError(err);
+
+        commander.verbose && process.stdout.write('.');
+
+        _.each(data.Contents,function(entry){
+            existingObjects[entry.Key] = entry.Size;
+        });
+
+        if (data.IsTruncated)
+            emitter.emit('listObjects',data.Contents[data.MaxKeys - 1].Key);
+        else
+            emitter.emit('findFiles')
+    });
+}
+
+// COLLECT FILES TO UPLOAD
+
+var fs = require('fs');
+
+var uploadList = [];
+
+function findFile(srcpath,srcprefix){
+    var stats = fs.statSync(srcpath);
+
+    if (!srcprefix) srcprefix = _.trimStart(srcpath,'./');
+
+    if (!stats) exitOnError('file not found: ' + srcpath);
+
+    if (stats.isDirectory())
+        _.each(fs.readdirSync(srcpath),function(subpath){
+            findFile(srcpath + '/' + subpath,(srcprefix ? srcprefix + '/' : '') + subpath);
+        });
+    else {
+        var key = args.prefix + srcprefix;
+        if (existingObjects[key] && existingObjects[key] === stats.size)
+            commander.verbose && console.log('SKIP ' + srcpath);
+        else
+            uploadList.push({srcpath: srcpath,key: key,size: stats.size,update: !!existingObjects[key]});
+    }
+}
+
+// UPLOAD FILES TO S3
+
+function uploadFiles(){
+    if (uploadList.length === 0) return;
+
+    var entry = uploadList.shift();
+    var startTime = process.hrtime();
+
+    commander.verbose && process.stdout.write((entry.update ? 'UPDATE ' : 'ADD ') + entry.key + ' (' + entry.size + ') ...');
+
+    var stream = fs.createReadStream(entry.srcpath);
+    stream.on('error',function(){ stream.emit('end'); });
+    s3.upload({Bucket: args.dstbucket,Key: entry.key,Body: stream},function(err,data){
+        exitOnError(err);
+
+        var diff = process.hrtime(startTime);
+        console.log('' + diff[0] + 's');
+
+        emitter.emit('uploadFiles');
+    });
+}
+
+function exitOnError(error){
+    if (error) {
+        console.error(error);
+        process.exit(1);
+    }
+}
+
+// DEFINE EVENT STRUCTURE
+
+commander.verbose && process.stdout.write('find objects matching prefix: ' + args.prefix);
+
+emitter.on('listObjects',buildExistingObjects);
+
+emitter.on('findFiles',function(){
+    commander.verbose && console.log();
+    commander.verbose && console.log('find src files: ' + args.srcpath);
+    findFile(args.srcpath);
+    emitter.emit('uploadFiles');
+});
+
+emitter.on('uploadFiles',uploadFiles);
+
+emitter.emit('listObjects');

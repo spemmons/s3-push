@@ -1,0 +1,23 @@
+{
+  "name": "s3-push",
+  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spemmons/s3-pusher.git"
+  },
+  "keywords": [
+    "AWS",
+    "S3"
+  ],
+  "author": "Steve Emmons",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/spemmons/s3-pusher/issues"
+  },
+  "homepage": "https://github.com/spemmons/s3-pusher",
+  "dependencies": {
+    "aws-sdk": "^2.3.3",
+    "commander": "^2.9.0",
+    "lodash": "^4.10.0"
+  }
+}
