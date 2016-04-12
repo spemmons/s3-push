@@ -68,10 +68,11 @@ function findFile(srcpath,srcprefix){
         });
     else {
         var key = args.prefix + srcprefix;
-        if (existingObjects[key] && existingObjects[key] === stats.size)
-            commander.verbose && console.log('SKIP ' + srcpath);
+        var objectExists = existingObjects[key] !== undefined;
+        if (objectExists && existingObjects[key] === stats.size)
+            commander.verbose && console.log('skip ' + key);
         else
-            uploadList.push({srcpath: srcpath,key: key,size: stats.size,update: !!existingObjects[key]});
+            uploadList.push({srcpath: srcpath,key: key,size: stats.size,update: objectExists});
     }
 }
 
@@ -83,7 +84,7 @@ function uploadFiles(){
     var entry = uploadList.shift();
     var startTime = process.hrtime();
 
-    commander.verbose && process.stdout.write((entry.update ? 'UPDATE ' : 'ADD ') + entry.key + ' (' + entry.size + ') ...');
+    commander.verbose && process.stdout.write((entry.update ? 'upadte ' : 'add ') + entry.key + ' (' + entry.size + ') ...');
 
     var stream = fs.createReadStream(entry.srcpath);
     stream.on('error',function(){ stream.emit('end'); });
