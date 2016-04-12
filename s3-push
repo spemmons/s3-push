@@ -84,7 +84,7 @@ function uploadFiles(){
     var entry = uploadList.shift();
     var startTime = process.hrtime();
 
-    commander.verbose && process.stdout.write((entry.update ? 'upadte ' : 'add ') + entry.key + ' (' + entry.size + ') ...');
+    commander.verbose && process.stdout.write((entry.update ? 'update ' : 'add ') + entry.key + ' (' + entry.size + ') ...');
 
     var stream = fs.createReadStream(entry.srcpath);
     stream.on('error',function(){ stream.emit('end'); });
